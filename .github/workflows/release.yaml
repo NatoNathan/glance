@@ -10,6 +10,8 @@ on:
 
 jobs:
   release:
+    # Publishes to the upstream Docker Hub account, this fork publishes through publish.yaml instead
+    if: github.repository == 'glanceapp/glance'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout the target Git reference

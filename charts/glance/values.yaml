@@ -1,0 +1,175 @@
+# -- Number of replicas. Glance keeps state such as login rate limits in memory and OIDC
+# sessions in a file, so running more than one replica is not supported.
+replicaCount: 1
+
+image:
+  # -- Image repository. The upstream glanceapp/glance image also works, but doesn't support OIDC.
+  repository: ghcr.io/natonathan/glance
+  # -- Image tag, defaults to the chart's appVersion
+  tag: ""
+  pullPolicy: IfNotPresent
+
+imagePullSecrets: []
+nameOverride: ""
+fullnameOverride: ""
+
+# -- Labels added to every resource
+commonLabels: {}
+
+# -- Contents of glance.yml. Either a map, which is rendered as YAML, or a string that is used
+# as is. Values can reference environment variables with ${VAR}, see env, envFrom and secretEnv.
+# server.port is always set to containerPort.
+config:
+  pages:
+    - name: Home
+      columns:
+        - size: small
+          widgets:
+            - type: calendar
+        - size: full
+          widgets:
+            - type: rss
+              feeds:
+                - url: https://selfh.st/rss/
+                  title: selfh.st
+
+# -- Additional files placed next to glance.yml, e.g. for use with $include. Keys are file names.
+extraConfigFiles: {}
+#  home.yml: |
+#    - name: Home
+#      columns: []
+
+# -- Use an existing ConfigMap containing glance.yml (and any included files) instead of config
+existingConfigMap: ""
+
+# -- Whether to restart the pod when the config changes. Glance reloads its config on its own,
+# but ConfigMap updates can take a minute or more to reach the pod.
+restartOnConfigChange: true
+
+secretKey:
+  # -- Generate a random auth secret-key and expose it as the GLANCE_SECRET_KEY environment
+  # variable, reference it in the config with `secret-key: ${GLANCE_SECRET_KEY}`. The value is
+  # kept across upgrades.
+  generate: false
+  # -- Use an existing Secret instead, it must have a `secret-key` key
+  existingSecret: ""
+
+# -- Environment variables stored in a Secret created by the chart, e.g. OIDC_CLIENT_SECRET.
+# Prefer envFrom with an existing Secret for anything that shouldn't live in your values.
+secretEnv: {}
+
+# -- Additional environment variables
+env: []
+#  - name: TZ
+#    value: Europe/London
+
+# -- Additional environment variables from Secrets or ConfigMaps
+envFrom: []
+#  - secretRef:
+#      name: glance-oidc
+
+containerPort: 8080
+
+service:
+  type: ClusterIP
+  port: 80
+  annotations: {}
+
+ingress:
+  enabled: false
+  className: ""
+  annotations: {}
+  hosts:
+    - host: glance.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+  tls: []
+  #  - secretName: glance-tls
+  #    hosts:
+  #      - glance.example.com
+
+# -- Gateway API HTTPRoute
+httpRoute:
+  enabled: false
+  annotations: {}
+  # -- Gateways the route attaches to
+  parentRefs:
+    - name: gateway
+      # namespace: gateway-system
+      # sectionName: https
+  hostnames:
+    - glance.example.com
+  # -- Rules of the route, backendRefs pointing at the Glance service are added automatically
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /
+      # filters: []
+
+persistence:
+  # -- Store data, such as OIDC sessions, on a PersistentVolumeClaim. An emptyDir is used
+  # otherwise, which means users have to log in again after the pod is restarted.
+  enabled: false
+  existingClaim: ""
+  storageClass: ""
+  accessModes:
+    - ReadWriteOnce
+  size: 100Mi
+  annotations: {}
+  # -- Where the data volume is mounted. OIDC sessions are stored here unless the config sets
+  # auth.oidc.session-file.
+  mountPath: /app/data
+
+serviceAccount:
+  create: true
+  automount: false
+  annotations: {}
+  name: ""
+
+podAnnotations: {}
+podLabels: {}
+
+podSecurityContext:
+  runAsNonRoot: true
+  # The nonroot user of the distroless image
+  runAsUser: 65532
+  runAsGroup: 65532
+  fsGroup: 65532
+  seccompProfile:
+    type: RuntimeDefault
+
+securityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  capabilities:
+    drop:
+      - ALL
+
+resources: {}
+#  requests:
+#    cpu: 10m
+#    memory: 32Mi
+#  limits:
+#    memory: 128Mi
+
+livenessProbe:
+  httpGet:
+    path: /api/healthz
+    port: http
+readinessProbe:
+  httpGet:
+    path: /api/healthz
+    port: http
+
+# -- Additional volumes, e.g. for server.assets-path
+extraVolumes: []
+extraVolumeMounts: []
+
+nodeSelector: {}
+tolerations: []
+affinity: {}
+
+# -- Additional manifests to deploy, rendered with tpl
+extraObjects: []

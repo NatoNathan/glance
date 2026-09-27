@@ -113,7 +113,7 @@ Alternatively, you can load the contents of a file who's path is provided by an 
 ```yaml
 services:
   glance:
-    image: glanceapp/glance
+    image: ghcr.io/natonathan/glance
     environment:
       - TOKEN_FILE=/home/user/token
     volumes:
@@ -181,7 +181,7 @@ glance --config /path/to/glance.yml config:print | less -N
 This is a bit more convoluted when running Glance inside a Docker container:
 
 ```sh
-docker run --rm -v ./glance.yml:/app/config/glance.yml glanceapp/glance config:print | less -N
+docker run --rm -v ./glance.yml:/app/config/glance.yml ghcr.io/natonathan/glance config:print | less -N
 ```
 
 This assumes that the config you want to print is in your current working directory and is named `glance.yml`.
@@ -249,7 +249,7 @@ To generate a secret key, run the following command:
 Or with Docker:
 
 ```sh
-docker run --rm glanceapp/glance secret:make
+docker run --rm ghcr.io/natonathan/glance secret:make
 ```
 
 ### Using hashed passwords
@@ -263,7 +263,7 @@ If you do not want to store plain passwords in your config file or in environmen
 Or with Docker:
 
 ```sh
-docker run --rm glanceapp/glance password:hash mysecretpassword
+docker run --rm ghcr.io/natonathan/glance password:hash mysecretpassword
 ```
 
 Then, in your config file use the `password-hash` property instead of `password`:
@@ -341,7 +341,7 @@ Once every `recheck-interval`, Glance also uses the session's refresh token to c
 
 Some providers only issue refresh tokens when the `offline_access` scope is requested or, in Google's case, with the `auth-params` mentioned above. Without a refresh token, sessions can't be rechecked, so they only last for as long as the provider says the access token is valid for, typically an hour, after which the user has to log in again.
 
-Sessions last at most `session-max-age`. They're saved in `session-file`, which is relative to the directory of your main config file unless it's an absolute path, so that they survive restarts. The file is encrypted using `secret-key`, and changing `secret-key` logs out everyone. If you use Docker, make sure the file is on a mounted volume, which it will be by default when the `config` directory is mounted.
+Sessions last at most `session-max-age`. They're saved in `session-file`, which is relative to the directory of your main config file unless it's an absolute path, so that they survive restarts. The file is encrypted using `secret-key`, and changing `secret-key` logs out everyone. If you use Docker, make sure the file is on a mounted volume, which it will be by default when the `config` directory is mounted. The `ghcr.io/natonathan/glance` image runs as user `65532`, so that user must be able to write to the directory, e.g. with `chown 65532:65532 config` or by running the container as the owner of the directory with `user: 1000:1000` in your `docker-compose.yml`. When using the Helm chart, sessions are stored on the chart's data volume instead.
 
 Logging out ends the session and revokes its refresh token at the provider if it supports it. With `logout-from-provider: true`, the user is also sent to the provider's logout page, which then sends them back to Glance's login page. You may need to add the login page URL, e.g. `https://glance.example.com/login`, to the allowed post logout redirect URIs of your client.
 

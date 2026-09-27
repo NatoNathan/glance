@@ -1,0 +1,14 @@
+apiVersion: v2
+name: glance
+description: A self-hosted dashboard that puts all your feeds in one place
+type: application
+version: 0.1.0
+appVersion: "v0.8.6-oidc.1"
+home: https://github.com/NatoNathan/glance
+sources:
+  - https://github.com/NatoNathan/glance
+keywords:
+  - dashboard
+  - homepage
+  - rss
+kubeVersion: ">=1.25.0-0"

@@ -1,0 +1,32 @@
+Glance has been deployed.
+
+{{- if .Values.httpRoute.enabled }}
+
+It is exposed through an HTTPRoute at:
+{{- range .Values.httpRoute.hostnames }}
+  https://{{ tpl . $ }}
+{{- end }}
+{{- else if .Values.ingress.enabled }}
+
+It is exposed through an Ingress at:
+{{- range .Values.ingress.hosts }}
+  http{{ if $.Values.ingress.tls }}s{{ end }}://{{ tpl .host $ }}
+{{- end }}
+{{- else }}
+
+To access it, run:
+  kubectl --namespace {{ .Release.Namespace }} port-forward svc/{{ include "glance.fullname" . }} 8080:{{ .Values.service.port }}
+and open http://localhost:8080
+{{- end }}
+
+{{- if and (kindIs "map" .Values.config) (dig "auth" "oidc" nil .Values.config) (not .Values.persistence.enabled) }}
+
+WARNING: OIDC is configured but persistence is disabled, users will have to log in again whenever
+the pod is restarted. Set persistence.enabled=true to keep sessions.
+{{- end }}
+{{- if and .Values.secretKey.generate (kindIs "map" .Values.config) (not (dig "auth" "secret-key" "" .Values.config)) }}
+
+A secret-key was generated, reference it in your config with:
+  auth:
+    secret-key: ${GLANCE_SECRET_KEY}
+{{- end }}

@@ -153,6 +153,10 @@ pages:
 
 ## Installation
 
+> [!NOTE]
+>
+> This is a fork of [glanceapp/glance](https://github.com/glanceapp/glance) that adds [single sign-on through OIDC](docs/configuration.md#single-sign-on-oidc) and a [Helm chart](charts/glance). Its image is published as `ghcr.io/natonathan/glance` and runs as a non-root user on a distroless base. The upstream `glanceapp/glance` image works with the same instructions, but doesn't support OIDC.
+
 Choose one of the following methods:
 
 <details>
@@ -168,7 +172,7 @@ mkdir glance && cd glance && curl -sL https://github.com/glanceapp/docker-compos
 *[click here to view the files that will be created](https://github.com/glanceapp/docker-compose-template/tree/main/root)*
 
 Then, edit the following files as desired:
-* `docker-compose.yml` to configure the port, volumes and other containery things
+* `docker-compose.yml` to configure the port, volumes and other containery things, and change `image` to `ghcr.io/natonathan/glance` to use this fork
 * `config/home.yml` to configure the widgets or layout of the home page
 * `config/glance.yml` if you want to change the theme or add more pages
 
@@ -204,7 +208,7 @@ Create a `docker-compose.yml` file with the following contents:
 services:
   glance:
     container_name: glance
-    image: glanceapp/glance
+    image: ghcr.io/natonathan/glance
     restart: unless-stopped
     volumes:
       - ./config:/app/config
@@ -229,6 +233,21 @@ If you encounter any issues, you can check the logs by running:
 ```bash
 docker logs glance
 ```
+
+<hr>
+</details>
+
+<details>
+<summary><strong>Kubernetes (Helm)</strong></summary>
+<br>
+
+The chart is published to GHCR as an OCI chart and supports Ingress, Gateway API HTTPRoutes and persistent OIDC sessions:
+
+```bash
+helm install glance oci://ghcr.io/natonathan/charts/glance --values values.yaml
+```
+
+See the [chart's README](charts/glance/README.md) for configuration examples.
 
 <hr>
 </details>
