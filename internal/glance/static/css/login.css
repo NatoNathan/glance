@@ -153,3 +153,12 @@
     border: none;
     cursor: pointer;
 }
+
+.login-button-sso {
+    text-decoration: none;
+    box-shadow: 0 0 10px 1px var(--color-separator);
+}
+
+.login-button + .login-button-sso {
+    margin-top: 1.5rem;
+}

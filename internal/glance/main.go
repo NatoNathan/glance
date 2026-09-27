@@ -6,6 +6,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"path/filepath"
 
 	"golang.org/x/crypto/bcrypt"
 )
@@ -114,6 +115,7 @@ func serveApp(configPath string) error {
 			return
 		}
 
+		config.mainConfigDir = filepath.Dir(configPath)
 		app, err := newApplication(config)
 		if err != nil {
 			log.Printf("Failed to create application: %v", err)
@@ -164,6 +166,7 @@ func serveApp(configPath string) error {
 		if err != nil {
 			return fmt.Errorf("validating config file: %w", err)
 		}
+		config.mainConfigDir = filepath.Dir(configPath)
 
 		app, err := newApplication(config)
 		if err != nil {

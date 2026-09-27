@@ -28,6 +28,9 @@ const (
 )
 
 type config struct {
+	// Directory of the main config file, relative paths such as the OIDC session file are resolved against it
+	mainConfigDir string
+
 	Server struct {
 		Host       string `yaml:"host"`
 		Port       uint16 `yaml:"port"`
@@ -39,6 +42,7 @@ type config struct {
 	Auth struct {
 		SecretKey string           `yaml:"secret-key"`
 		Users     map[string]*user `yaml:"users"`
+		OIDC      *oidcConfig      `yaml:"oidc"`
 	} `yaml:"auth"`
 
 	Document struct {
@@ -455,6 +459,16 @@ func isConfigStateValid(config *config) error {
 
 	if len(config.Auth.Users) > 0 && config.Auth.SecretKey == "" {
 		return fmt.Errorf("secret-key must be set when users are configured")
+	}
+
+	if config.Auth.OIDC != nil {
+		if config.Auth.SecretKey == "" {
+			return fmt.Errorf("secret-key must be set when oidc is configured")
+		}
+
+		if err := config.Auth.OIDC.validate(); err != nil {
+			return err
+		}
 	}
 
 	for username := range config.Auth.Users {

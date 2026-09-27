@@ -276,6 +276,75 @@ auth:
       password-hash: $2a$10$o6SXqiccI3DDP2dN4ADumuOeIHET6Q4bUMYZD6rT2Aqt6XQ3DyO.6
 ```
 
+### Single sign-on (OIDC)
+
+Glance can also let users log in through an OpenID Connect identity provider such as Authelia, Authentik, Keycloak, Pocket ID, Google, etc. It can be used alongside or instead of `users`; when no `users` are configured the login page only shows the single sign-on button.
+
+```yaml
+auth:
+  secret-key: # this must be set to a random value generated using the secret:make CLI command
+  oidc:
+    issuer-url: https://auth.example.com/application/o/glance/
+    client-id: glance
+    client-secret: ${OIDC_CLIENT_SECRET}
+    redirect-url: https://glance.example.com/auth/oidc/callback
+    button-label: Authentik
+    allowed-groups:
+      - glance-users
+    allowed-emails:
+      - admin@example.com
+```
+
+In your identity provider, create a confidential client with the authorization code flow and set its redirect URI to the same value as `redirect-url`. Glance uses PKCE, so public clients without a `client-secret` also work if your provider supports them.
+
+| Name | Type | Required | Default |
+| ---- | ---- | -------- | ------- |
+| issuer-url | string | yes | |
+| client-id | string | yes | |
+| client-secret | string | no | |
+| redirect-url | string | yes | |
+| scopes | array | no | [openid, profile, email] |
+| auth-params | map | no | |
+| username-claim | string | no | preferred_username |
+| groups-claim | string | no | groups |
+| allowed-emails | array | no | |
+| allowed-usernames | array | no | |
+| allowed-groups | array | no | |
+| allow-all | boolean | no | false |
+| recheck-interval | string | no | 5m |
+| session-max-age | string | no | 14d |
+| session-file | string | no | glance-oidc-sessions.dat |
+| logout-from-provider | boolean | no | false |
+| button-label | string | no | SSO |
+
+`issuer-url` must match the `issuer` in the provider's `/.well-known/openid-configuration` exactly, including any trailing slash.
+
+`redirect-url` is the full, publicly reachable URL of Glance followed by `/auth/oidc/callback`. If you use `base-url`, include it, e.g. `https://example.com/glance/auth/oidc/callback`.
+
+`auth-params` are extra parameters added to the authorization request, for example `access_type: offline` and `prompt: consent`, which Google requires before it issues refresh tokens.
+
+#### Who can log in
+
+`allowed-emails`, `allowed-usernames` and `allowed-groups` restrict who can log in. A user is let in if they match any of them:
+
+- `allowed-emails` is matched against the `email` claim, case insensitively, and only when the provider marks the email as verified (`email_verified: true`). Some providers, such as Microsoft Entra ID, don't send `email_verified`, use groups or usernames with those.
+- `allowed-usernames` is matched against the claim set by `username-claim`, case sensitively. At some providers users can change their own `preferred_username`, in which case set `username-claim` to a claim that only administrators can change, or to `sub`.
+- `allowed-groups` is matched against the claim set by `groups-claim`. Most providers only include groups when requested, so you may need to add a `groups` scope to `scopes` or a groups mapper to your client.
+
+At least one of these must be set. To let in every account that can log in to your identity provider, set `allow-all: true` instead. This is almost never what you want with public providers such as Google.
+
+#### Sessions
+
+Every login gets its own session, which is checked against the allow lists above on every request, so removing a user from them logs out just that user.
+
+Once every `recheck-interval`, Glance also uses the session's refresh token to check with the identity provider that the account still has access, and updates its email, username and groups. If the provider rejects the refresh, because the account was disabled, its session at the provider was revoked or it was removed from an allowed group, the user is logged out. If the provider can't be reached, the user stays logged in and the check is retried, for up to an hour past the `recheck-interval`.
+
+Some providers only issue refresh tokens when the `offline_access` scope is requested or, in Google's case, with the `auth-params` mentioned above. Without a refresh token, sessions can't be rechecked, so they only last for as long as the provider says the access token is valid for, typically an hour, after which the user has to log in again.
+
+Sessions last at most `session-max-age`. They're saved in `session-file`, which is relative to the directory of your main config file unless it's an absolute path, so that they survive restarts. The file is encrypted using `secret-key`, and changing `secret-key` logs out everyone. If you use Docker, make sure the file is on a mounted volume, which it will be by default when the `config` directory is mounted.
+
+Logging out ends the session and revokes its refresh token at the provider if it supports it. With `logout-from-provider: true`, the user is also sent to the provider's logout page, which then sends them back to Glance's login page. You may need to add the login page URL, e.g. `https://glance.example.com/login`, to the allowed post logout redirect URIs of your client.
+
 ### Preventing brute-force attacks
 
 Glance will automatically block IP addresses of users who fail to authenticate 5 times in a row in the span of 5 minutes. In order for this feature to work correctly, Glance must know the real IP address of requests. If you're using a reverse proxy such as nginx, Traefik, NPM, etc, you must set the `proxied` property in the `server` configuration to `true`:

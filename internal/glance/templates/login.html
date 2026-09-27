@@ -9,14 +9,17 @@
 
 {{- define "document-head-after" }}
 <link rel="stylesheet" href='{{ .App.StaticAssetPath "css/login.css" }}'>
+{{- if .App.Config.Auth.Users }}
 <script type="module" src='{{ .App.StaticAssetPath "js/login.js" }}'></script>
+{{- end }}
 {{- end }}
 
 {{- define "document-body" }}
 <div class="flex flex-column body-content">
     <div class="flex grow items-center justify-center" style="padding-bottom: 5rem">
         <h1 class="visually-hidden">Login</h1>
-        <main id="login-container" class="grow login-bounds" style="display: none;">
+        <main id="login-container" class="grow login-bounds"{{ if .App.Config.Auth.Users }} style="display: none;"{{ end }}>
+            {{- if .App.Config.Auth.Users }}
             <div class="animate-entrance">
                 <label class="form-label widget-header" for="username">Username</label>
                 <div class="form-input widget-content-frame padding-inline-widget flex gap-10 items-center">
@@ -38,7 +41,7 @@
                 </div>
             </div>
 
-            <div class="login-error-message" id="error-message"></div>
+            <div class="login-error-message" id="error-message">{{ .LoginError }}</div>
 
             <button class="login-button animate-entrance" id="login-button">
                 <div>LOGIN</div>
@@ -46,6 +49,15 @@
                     <path stroke-linecap="round" stroke-linejoin="round" d="M13.5 4.5 21 12m0 0-7.5 7.5M21 12H3" />
                 </svg>
             </button>
+            {{- else }}
+            <div class="login-error-message">{{ .LoginError }}</div>
+            {{- end }}
+
+            {{- if .App.Config.Auth.OIDC }}
+            <a class="login-button login-button-sso animate-entrance" href="{{ .App.Config.Server.BaseURL }}/auth/oidc/login">
+                <div>SIGN IN WITH {{ .App.Config.Auth.OIDC.ButtonLabel }}</div>
+            </a>
+            {{- end }}
         </main>
     </div>
     {{ template "footer.html" . }}

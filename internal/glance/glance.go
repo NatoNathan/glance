@@ -42,6 +42,7 @@ type application struct {
 	usernameHashToUsername map[string]string
 	authAttemptsMu         sync.Mutex
 	failedAuthAttempts     map[string]*failedAuthAttempt
+	oidc                   *oidcAuthenticator
 }
 
 func newApplication(c *config) (*application, error) {
@@ -58,7 +59,7 @@ func newApplication(c *config) (*application, error) {
 	// Init auth
 	//
 
-	if len(config.Auth.Users) > 0 {
+	if len(config.Auth.Users) > 0 || config.Auth.OIDC != nil {
 		secretBytes, err := base64.StdEncoding.DecodeString(config.Auth.SecretKey)
 		if err != nil {
 			return nil, fmt.Errorf("decoding secret-key: %v", err)
@@ -95,6 +96,21 @@ func newApplication(c *config) (*application, error) {
 		}
 
 		app.authSecretKey = secretBytes
+
+		if config.Auth.OIDC != nil {
+			config.Auth.OIDC.applyDefaults(config.mainConfigDir)
+
+			sessions, err := openOIDCSessionStore(config.Auth.OIDC.SessionFile, secretBytes)
+			if err != nil {
+				return nil, fmt.Errorf("opening OIDC session store: %v", err)
+			}
+
+			app.oidc = newOIDCAuthenticator(config.Auth.OIDC, sessions)
+
+			if config.Auth.OIDC.AllowAll {
+				log.Println("WARNING: OIDC is configured with allow-all, every user of the identity provider will be able to log in")
+			}
+		}
 	}
 
 	//
@@ -282,9 +298,10 @@ type templateRequestData struct {
 }
 
 type templateData struct {
-	App     *application
-	Page    *page
-	Request templateRequestData
+	App        *application
+	Page       *page
+	Request    templateRequestData
+	LoginError string
 }
 
 func (a *application) populateTemplateRequestData(data *templateRequestData, r *http.Request) {
@@ -463,6 +480,11 @@ func (a *application) server() (func() error, func() error) {
 		mux.HandleFunc("GET /login", a.handleLoginPageRequest)
 		mux.HandleFunc("GET /logout", a.handleLogoutRequest)
 		mux.HandleFunc("POST /api/authenticate", a.handleAuthenticationAttempt)
+
+		if a.oidc != nil {
+			mux.HandleFunc("GET "+AUTH_OIDC_LOGIN_PATH, a.handleOIDCLoginRequest)
+			mux.HandleFunc("GET "+AUTH_OIDC_CALLBACK_PATH, a.handleOIDCCallbackRequest)
+		}
 	}
 
 	mux.Handle(

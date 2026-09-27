@@ -257,6 +257,10 @@ func (a *application) isAuthorized(w http.ResponseWriter, r *http.Request) bool 
 		return false
 	}
 
+	if a.oidc != nil && strings.HasPrefix(token.Value, AUTH_OIDC_SESSION_PREFIX) {
+		return a.oidc.authorizeSession(strings.TrimPrefix(token.Value, AUTH_OIDC_SESSION_PREFIX))
+	}
+
 	usernameHash, shouldRegenerate, err := verifySessionToken(token.Value, a.authSecretKey, time.Now())
 	if err != nil {
 		return false
@@ -305,6 +309,15 @@ func (a *application) handleUnauthorizedResponse(w http.ResponseWriter, r *http.
 // Maybe this should be a POST request instead?
 func (a *application) handleLogoutRequest(w http.ResponseWriter, r *http.Request) {
 	a.setAuthSessionCookie(w, r, "", time.Now().Add(-1*time.Hour))
+
+	if token, err := r.Cookie(AUTH_SESSION_COOKIE_NAME); err == nil && a.oidc != nil &&
+		strings.HasPrefix(token.Value, AUTH_OIDC_SESSION_PREFIX) {
+		if providerLogoutURL := a.oidc.logout(strings.TrimPrefix(token.Value, AUTH_OIDC_SESSION_PREFIX)); providerLogoutURL != "" {
+			http.Redirect(w, r, providerLogoutURL, http.StatusSeeOther)
+			return
+		}
+	}
+
 	http.Redirect(w, r, a.Config.Server.BaseURL+"/login", http.StatusSeeOther)
 }
 
@@ -330,6 +343,10 @@ func (a *application) handleLoginPageRequest(w http.ResponseWriter, r *http.Requ
 		App: a,
 	}
 	a.populateTemplateRequestData(&data.Request, r)
+
+	if a.oidc != nil {
+		data.LoginError = oidcLoginErrorMessages[r.URL.Query().Get("error")]
+	}
 
 	var responseBytes bytes.Buffer
 	err := loginPageTemplate.Execute(&responseBytes, data)
